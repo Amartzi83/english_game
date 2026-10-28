@@ -118,6 +118,7 @@ a { color: var(--ink); }
 .he { font-size: 1.6rem; font-weight: 700; }
 .big-word { font-size: clamp(2.4rem, 11vw, 3.6rem); font-weight: 600; color: var(--ink); line-height: 1.1; }
 .he-word { font-family: var(--font-body); font-weight: 700; }
+.tf-claim { font-size: clamp(1.7rem, 8vw, 2.4rem); text-wrap: balance; }
 .say { color: var(--muted); font-size: 1.05rem; }
 .say b { color: var(--fg); font-size: 1.2rem; }
 .ex { color: var(--muted); font-size: 1rem; }
@@ -144,6 +145,29 @@ a { color: var(--ink); }
   margin: 0; background: var(--warn-soft); border-radius: 14px; padding: 10px 14px; text-align: center;
   font-size: 1.05rem;
 }
+
+/* Spinning wheel */
+.wheel-wrap { --size: min(270px, 72vw); position: relative; width: var(--size); margin: 0 auto; }
+.wheel {
+  width: var(--size); aspect-ratio: 1; max-width: 100%; border-radius: 50%; position: relative;
+  border: 6px solid var(--ink); box-shadow: var(--shadow);
+  background: conic-gradient(var(--tile) 0 45deg, var(--good-soft) 45deg 90deg, var(--tile) 90deg 135deg, var(--good-soft) 135deg 180deg,
+    var(--tile) 180deg 225deg, var(--good-soft) 225deg 270deg, var(--tile) 270deg 315deg, var(--good-soft) 315deg 360deg);
+  transition: transform 2.1s cubic-bezier(.15, .8, .2, 1);
+}
+.wseg { position: absolute; left: 50%; top: 50%; width: 2.6em; height: 2.6em; margin: -1.3em; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+.pointer { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 2rem; color: var(--bad); z-index: 2; line-height: 1; }
+
+/* Matching pairs */
+.match { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mbtn {
+  min-height: 54px; border-radius: 14px; border: 2px solid var(--slot-edge); background: var(--card);
+  font-weight: 700; font-size: 1.05rem; padding: 6px 10px; box-shadow: var(--shadow);
+}
+.mbtn.en-b { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; color: var(--ink); }
+.mbtn.sel { border-color: var(--ink); background: var(--slot); }
+.mbtn.matched { background: var(--good-soft); color: var(--good); border-color: var(--good); box-shadow: none; cursor: default; }
 
 /* Letter tiles */
 .tiles {
@@ -447,12 +471,24 @@ const PRON_REVIEW = { kind: 'quiz', q: 'review', name: 'חיזוק כינויי 
 const ALL_P = ['I', 'You', 'He', 'She', 'It', 'We', 'They'];
 const TEST6 = ['He', 'She', 'It', 'We', 'They', 'You'];
 const NEAR = { I: ['We', 'You'], You: ['We', 'They'], He: ['She', 'It'], She: ['He', 'It'], It: ['He', 'She'], We: ['They', 'You'], They: ['We', 'It'] };
-const PRACTICE_LINKS = [
-  ['חידון כינויי גוף (Wordwall)', 'https://wordwall.net/resource/89938028/english/personal-pronouns-quiz'],
-  ['תרגול כינויי גוף (Wordwall)', 'https://wordwall.net/resource/106163015/esol/personal-pronouns-hw'],
-  ['גלגל כינויי גוף (Wordwall)', 'https://wordwall.net/resource/1682690/wheel'],
-  ['משחק כינויי גוף (Wordwall)', 'https://wordwall.net/resource/4434249/pronouns'],
-  ['אתר הכתבה באנגלית', 'https://www.hachtava.co.il/english.html']
+// Things to spin on the wheel and to judge in "true or false".
+const WHEEL_ITEMS = [
+  { pic: '👧', n: 'Sarah', a: 'She', r: 'girl' },        { pic: '👦', n: 'David', a: 'He', r: 'boy' },
+  { pic: '🐱', n: 'the cat', a: 'It', r: 'thing' },       { pic: '👦🙋', n: 'Tom and I', a: 'We', r: 'weI' },
+  { pic: '👩👨', n: 'Mom and Dad', a: 'They', r: 'many' }, { pic: '🚲', n: 'the bicycle', a: 'It', r: 'thing' },
+  { pic: '👵', n: 'Grandma', a: 'She', r: 'girl' },       { pic: '👴', n: 'Grandpa', a: 'He', r: 'boy' },
+  { pic: '🧒🧒', n: 'the children', a: 'They', r: 'many' }, { pic: '👉👦', n: 'you and Dan', a: 'You', r: 'youAnd' },
+  { pic: '👧🙋', n: 'my sister and I', a: 'We', r: 'weI' }, { pic: '📚', n: 'the books', a: 'They', r: 'many' },
+  { pic: '☀️', n: 'the sun', a: 'It', r: 'thing' },        { pic: '👩‍🏫', n: 'Mrs. Levi', a: 'She', r: 'girl' },
+  { pic: '👨‍⚕️', n: 'Mr. Cohen', a: 'He', r: 'boy' },      { pic: '🐶🐶', n: 'the dogs', a: 'They', r: 'many' },
+  { pic: '👉👧', n: 'you and Mia', a: 'You', r: 'youAnd' }, { pic: '👨‍👩‍👧🙋', n: 'my family and I', a: 'We', r: 'weI' }
+];
+// More ways to practice, in the formats of the class practice sites: wheel, matching pairs, listening, true or false.
+const PRON_GAMES = [
+  { kind: 'quiz', q: 'wheel',  ico: '🎡', name: 'גלגל המזל',        desc: 'מסובבים את הגלגל ובוחרים כינוי גוף', extra: true },
+  { kind: 'match',             ico: '🧩', name: 'התאמת זוגות',      desc: 'מחברים כל מילה באנגלית לפירוש שלה', extra: true },
+  { kind: 'quiz', q: 'listen', ico: '👂', name: 'מה שמעתם?',        desc: 'מקשיבים למשפט ובוחרים מה נאמר', extra: true },
+  { kind: 'quiz', q: 'tf',     ico: '✅', name: 'נכון או לא נכון?', desc: 'בודקים אם כינוי הגוף מתאים', extra: true }
 ];
 
 const BADGES = [
@@ -712,10 +748,14 @@ function rulesHTML() {
     <p>טיפ: חפשו במשפט על מי מדברים. Tom and I = אני ועוד מישהו, ולכן We.</p>
   </section>`;
 }
-function linksHTML() {
-  return `<section class="notebook"><h2>עוד תרגול באתרים</h2>
-    <ul class="links">${PRACTICE_LINKS.map(([t, u]) => `<li><a href="${u}" target="_blank" rel="noopener">${t}</a></li>`).join('')}</ul>
-  </section>`;
+function gamesHTML() {
+  const open = starsFor('pron', 0) > 0;
+  return `<h2 class="section-title">עוד דרכים לתרגל</h2>
+    <div class="levels">${PRON_GAMES.map((g, i) => `<button class="level ${starsFor('pronx', i) ? 'done' : ''}" data-act="extra" data-i="${i}" ${open ? '' : 'disabled'}>
+      <span class="num">${open ? g.ico : '🔒'}</span>
+      <span class="lv-text"><b>${g.name}</b><small>${open ? g.desc : 'נפתח אחרי שלב ההכרות'}</small></span>
+      ${starsHTML(starsFor('pronx', i))}
+    </button>`).join('')}</div>`;
 }
 function showHome() {
   S.screen = 'home';
@@ -728,7 +768,7 @@ function showHome() {
       ${starsHTML(st)}
     </button>`;
   }).join('');
-  const extra = isPron() ? rulesHTML() + linksHTML()
+  const extra = isPron() ? gamesHTML() + rulesHTML()
     : `<section class="notebook"><h2>${list().name} · ${list().words.length} מילים</h2><ol>${list().words.map(w => `<li><span class="en">${w.en}</span><span class="he-s">${w.he}</span></li>`).join('')}</ol></section>`;
   app.innerHTML = `${topBar(false)}
     ${helloHTML()}
@@ -799,6 +839,10 @@ function startLevel(lv) {
   const idx = list().words.map((_, i) => i);
   beginRound(S.def.kind === 'learn' ? idx : shuffle(idx));
 }
+function startExtra(i) {
+  S.level = i; S.def = PRON_GAMES[i];
+  beginRound(S.def.kind === 'match' ? PRONOUNS.map((_, j) => j) : buildQuiz(S.def.q));
+}
 function startReview(fromRound) {
   // Practice what went wrong in this round, or else the weakest items overall.
   let keys = fromRound ? S.missedKeys : [];
@@ -823,6 +867,7 @@ function nextScreen() {
   else if (k === 'plearn') showPLearn();
   else if (k === 'fill') setupFill();
   else if (k === 'quiz') setupQuiz();
+  else if (k === 'match') setupMatch();
   else setupDict();
   window.scrollTo(0, 0);
 }
@@ -1080,11 +1125,34 @@ function qSentence(x, kind, mock) {
     options: mock ? (kind === 'replace' ? ALL_P.slice() : TEST6.slice()) : threeOptions(x.a),
     hint: `על מי מדברים? <bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}`, explain: `<bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}, ולכן <bdi class="en">${x.a}</bdi>` };
 }
+function fourOptions(a) {
+  return shuffle([a, ...NEAR[a], pick(ALL_P.filter(x => x !== a && !NEAR[a].includes(x)))]);
+}
+function whyHint(x) { return `על מי מדברים? <bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}`; }
+function whyExplain(x) { return `<bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}, ולכן <bdi class="en">${x.a}</bdi>`; }
+function qWheel(x) {
+  return { kind: 'wheel', item: x.a, pic: x.pic, prompt: x.n, answer: x.a, say: x.a, options: fourOptions(x.a),
+    hint: whyHint(x), explain: whyExplain(x) };
+}
+function qListen(x) {
+  return { kind: 'listen', item: x.a, s: x.s, n: x.n, answer: x.a, say: x.s.replace('___', x.a), options: threeOptions(x.a),
+    hint: 'הקשיבו שוב. כינוי הגוף נמצא בתחילת המשפט', explain: whyExplain(x) };
+}
+function qTF(x) {
+  const right = Math.random() < 0.5, shown = right ? x.a : pick(NEAR[x.a]);
+  return { kind: 'tf', item: x.a, n: x.n, shown, answer: right ? 'נכון' : 'לא נכון', options: ['לא נכון', 'נכון'], heOpts: true, say: x.a,
+    hint: whyHint(x),
+    explain: right ? `נכון! <bdi class="en">${esc(x.n)}</bdi> = <bdi class="en">${x.a}</bdi>`
+                   : `לא נכון. ${whyExplain(x)} ולא <bdi class="en">${shown}</bdi>` };
+}
 function meaningPool() { return [...PRONOUNS.map(qMeaningEn), ...HE_PROMPTS.map(qMeaningHe)]; }
 function buildQuiz(type) {
   if (type === 'meaning') return shuffle(meaningPool()).slice(0, 10);
   if (type === 'replace') return shuffle(REPLACE_Q).slice(0, 10).map(x => qSentence(x, 'replace'));
   if (type === 'sent') return shuffle(SENT_Q).slice(0, 10).map(x => qSentence(x, 'sent'));
+  if (type === 'wheel') return shuffle(WHEEL_ITEMS).slice(0, 8).map(qWheel);
+  if (type === 'listen') return shuffle([...REPLACE_Q, ...SENT_Q]).slice(0, 8).map(qListen);
+  if (type === 'tf') return shuffle([...WHEEL_ITEMS, ...REPLACE_Q.filter(x => x.a !== 'I')]).slice(0, 10).map(qTF);
   // Mock test: three parts in the order of the real worksheet.
   const tag = (qs, section) => qs.map(q => Object.assign(q, { section }));
   return [
@@ -1105,24 +1173,56 @@ function sentenceHTML(q, show, answer) {
   return esc(q.s).replace('___', gap) + (q.kind === 'replace' ? ` <span class="paren">(${esc(q.n)})</span>` : '');
 }
 function setupQuiz() {
-  S.word = { q: S.queue[S.qi], tried: [], mistake: false, done: false };
+  S.word = { q: S.queue[S.qi], tried: [], mistake: false, done: false, spun: false };
   S.busy = false;
+  if (S.word.q.kind === 'wheel') return renderWheel();
   renderQuiz('', '');
+  if (S.word.q.kind === 'listen') setTimeout(() => speak(S.word.q.say), 350);
+}
+function renderWheel() {
+  const W = S.word, q = W.q;
+  const others = shuffle(WHEEL_ITEMS.filter(x => x.pic !== q.pic)).slice(0, 7).map(x => x.pic);
+  const segs = shuffle([q.pic, ...others]);
+  W.k = segs.indexOf(q.pic);
+  const labels = segs.map((pic, i) => `<span class="wseg" style="transform: rotate(${i * 45 + 22.5}deg) translateY(calc(var(--size) * -0.33))">${pic}</span>`).join('');
+  app.innerHTML = `${topBar(true)}${progressHTML()}
+    <p class="prompt">סובבו את הגלגל וגלו על מי מדברים</p>
+    <div class="wheel-wrap"><div class="pointer" aria-hidden="true">▼</div><div class="wheel" id="wheel" aria-hidden="true">${labels}</div></div>
+    <div class="row"><button class="btn" data-act="spin">סובבו!</button></div>`;
+}
+function spin() {
+  const W = S.word;
+  if (W.spinning) return;
+  W.spinning = true;
+  const el = document.getElementById('wheel');
+  const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.style.transform = `rotate(${360 * 5 - (W.k * 45 + 22.5)}deg)`;
+  tone([440, 520, 620]);
+  setTimeout(() => { W.spun = true; renderQuiz('', ''); }, reduced ? 250 : 2250);
 }
 function renderQuiz(msg, cls) {
   const W = S.word, q = W.q, mock = !!S.def.mock, show = W.done;
   const body = q.kind === 'meaning'
     ? `<div class="big-word ${q.dir === 'en' ? 'en' : 'he-word'}">${q.prompt}</div>
        <p class="prompt">${q.dir === 'en' ? 'מה הפירוש בעברית?' : 'איך אומרים באנגלית?'}</p>`
+    : q.kind === 'wheel'
+    ? `<div class="pic" aria-hidden="true">${q.pic}</div><div class="big-word en">${esc(q.prompt)}</div>
+       <p class="prompt">איזה כינוי גוף מתאים?</p>`
+    : q.kind === 'tf'
+    ? `<p class="prompt">נכון או לא נכון?</p>
+       <div class="big-word en tf-claim">${esc(q.n)} = ${q.shown}</div>`
+    : q.kind === 'listen'
+    ? `<p class="prompt">הקשיבו למשפט ובחרו את כינוי הגוף ששמעתם</p>
+       ${show ? `<div class="sentence en">${sentenceHTML(q, true)}</div>` : '<div class="pic" aria-hidden="true">👂</div>'}`
     : `<p class="prompt">${q.kind === 'replace' ? 'השלימו את כינוי הגוף המתאים במקום המילה שבסוגריים' : 'השלימו את כינוי הגוף המתאים'}</p>
        <div class="sentence en">${sentenceHTML(q, show)}</div>`;
-  const canHear = show || (q.kind === 'meaning' && q.dir === 'en');
-  const opts = q.options.map((o, i) => `<button class="choice word ${q.dir === 'en' ? 'he-opt' : ''} ${show && o === q.answer ? 'right' : ''}"
+  const canHear = show || (q.kind === 'meaning' && q.dir === 'en') || q.kind === 'listen';
+  const opts = q.options.map((o, i) => `<button class="choice word ${q.dir === 'en' || q.heOpts ? 'he-opt' : ''} ${show && o === q.answer ? 'right' : ''}"
       data-act="qpick" data-i="${i}" ${W.tried.includes(i) || show ? 'disabled' : ''}>${o}</button>`).join('');
   const explain = !mock && W.mistake ? `<p class="explain">💡 ${show ? q.explain : q.hint}</p>` : '';
   app.innerHTML = `${topBar(true)}${progressHTML()}
     ${q.section ? `<p class="section-label">${q.section}</p>` : ''}
-    <div class="card">${body}${canHear ? speakBtn(q.say, q.kind === 'meaning' ? 'השמיעו' : 'השמיעו את המשפט') : ''}</div>
+    <div class="card">${body}${canHear ? speakBtn(q.say, ['meaning', 'wheel', 'tf'].includes(q.kind) ? 'השמיעו' : (q.kind === 'listen' && !show ? 'השמיעו שוב' : 'השמיעו את המשפט')) : ''}</div>
     <div class="choices">${opts}</div>
     <p class="feedback ${cls}" aria-live="polite">${msg}</p>
     ${explain}
@@ -1151,7 +1251,7 @@ function qpick(b) {
     speak(q.say);
     const msg = W.mistake ? 'נכון! קראו את ההסבר' : (combo ? `${praise()} 🔥 ${combo}` : praise());
     renderQuiz(msg, combo && !W.mistake ? 'warm' : 'good');
-    if (!W.mistake) { S.busy = true; setTimeout(() => { S.qi++; nextScreen(); }, q.kind === 'meaning' ? 1300 : 2300); }
+    if (!W.mistake) { S.busy = true; setTimeout(() => { S.qi++; nextScreen(); }, ['meaning', 'wheel', 'tf'].includes(q.kind) ? 1400 : 2300); }
   } else {
     sndBad();
     W.mistake = true;
@@ -1163,11 +1263,51 @@ function qpick(b) {
   }
 }
 
+// ---------- Matching pairs ----------
+function setupMatch() {
+  S.word = { left: shuffle(PRONOUNS.map(p => p.id)), right: shuffle(PRONOUNS.map(p => p.id)), sel: null, done: [], bad: [] };
+  renderMatch('', '');
+}
+function renderMatch(msg, cls) {
+  const W = S.word;
+  const btn = (side, id) => {
+    const done = W.done.includes(id), sel = W.sel && W.sel.side === side && W.sel.id === id;
+    return `<button class="mbtn ${side === 'en' ? 'en-b' : ''} ${done ? 'matched' : ''} ${sel ? 'sel' : ''}" data-act="mpick" data-side="${side}" data-id="${id}" ${done ? 'disabled' : ''}>${side === 'en' ? id : P_BY[id].he}</button>`;
+  };
+  app.innerHTML = `${topBar(true)}${progressHTML()}
+    <p class="prompt">לחצו על מילה באנגלית ועל הפירוש שלה בעברית</p>
+    <div class="match">
+      <div class="mcol">${W.right.map(id => btn('he', id)).join('')}</div>
+      <div class="mcol">${W.left.map(id => btn('en', id)).join('')}</div>
+    </div>
+    <p class="feedback ${cls}" aria-live="polite">${msg}</p>`;
+}
+function mpick(b) {
+  const W = S.word, side = b.dataset.side, id = b.dataset.id;
+  if (!W.sel || W.sel.side === side) { W.sel = { side, id }; if (side === 'en') speak(id); return renderMatch('', ''); }
+  const other = W.sel.id;
+  W.sel = null;
+  if (other === id) {
+    W.done.push(id);
+    const clean = !W.bad.includes(id);
+    if (clean) { S.firstTry++; addXP(3); }
+    recordWord('p:' + id, clean, 'quiz');
+    save();
+    sndGood(); speak(id);
+    S.qi++;
+    if (W.done.length === PRONOUNS.length) { renderMatch(praise(), 'good'); setTimeout(nextScreen, 900); return; }
+    return renderMatch(`${id} = ${P_BY[id].he}`, 'good');
+  }
+  W.bad.push(id, other);
+  sndBad(); S.combo = 0;
+  renderMatch('הזוג הזה לא מתאים. נסו שוב', 'bad');
+}
+
 // ---------- Level complete: stars, points and personal feedback ----------
 function showDone() {
   S.screen = 'done';
   const def = S.def, n = S.queue.length, learn = def.kind === 'learn' || def.kind === 'plearn';
-  const tk = topicKey(), lv = levels();
+  const tk = def.extra ? 'pronx' : topicKey(), lv = levels();
   const ratio = learn ? 1 : S.firstTry / n, grade = Math.round(ratio * 100);
   const stars = def.mock ? (grade >= 90 ? 3 : grade >= 75 ? 2 : 1) : (ratio >= 0.9 ? 3 : ratio >= 0.6 ? 2 : 1);
   const prev = learn || S.level < 0 ? [] : P.history.filter(h => (h.tk ?? h.list) === tk && h.lv === S.level);
@@ -1214,7 +1354,8 @@ function showDone() {
       ${q.kind === 'meaning' ? `<span><b class="${q.dir === 'en' ? 'en' : ''}">${q.prompt}</b> = <b class="${q.dir === 'en' ? '' : 'en'}">${q.answer}</b></span>`
                              : `<div class="sentence en">${sentenceHTML(q, true)}</div>`}
       <small>ענית: <bdi class="en">${val}</bdi></small>${q.kind === 'meaning' ? '' : `<small>${q.explain}</small>`}</li>`).join('') : '';
-  const hasNext = S.level >= 0 && S.level < lv.length - 1;
+  const hasNext = !def.extra && S.level >= 0 && S.level < lv.length - 1;
+  const again = def.extra ? `data-act="extra" data-i="${S.level}"` : `data-act="start" data-lv="${S.level}"`;
   const goNext = hasNext && stars >= 2;
   const nb = S.newBadges.map(id => BADGES.find(b => b.id === id)).map(b => `<span>${b.ico} ${b.name}</span>`).join('');
   app.innerHTML = `${topBar(true)}
@@ -1231,8 +1372,8 @@ function showDone() {
     <div class="row">
       ${S.missedKeys.length && !def.review ? `<button class="btn ${def.mock ? '' : 'soft'}" data-act="review-round">לתרגל את הטעויות</button>` : ''}
       ${goNext ? `<button class="btn" data-act="start" data-lv="${S.level + 1}">לשלב הבא: ${lv[S.level + 1].name}</button>` : ''}
-      ${!goNext && S.level >= 0 ? `<button class="btn ${def.mock && S.missedKeys.length ? 'soft' : ''}" data-act="start" data-lv="${S.level}">${def.mock ? 'מבחן חדש' : 'לשחק שוב ולשפר'}</button>` : ''}
-      ${goNext ? `<button class="btn soft" data-act="start" data-lv="${S.level}">לשחק שוב</button>` : ''}
+      ${!goNext && S.level >= 0 ? `<button class="btn ${def.mock && S.missedKeys.length ? 'soft' : ''}" ${again}>${def.mock ? 'מבחן חדש' : 'לשחק שוב ולשפר'}</button>` : ''}
+      ${goNext ? `<button class="btn soft" ${again}>לשחק שוב</button>` : ''}
       <button class="btn soft" data-act="home">לתפריט</button>
     </div>
     ${hasNext && !goNext ? '<p class="empty" style="text-align:center">השלב הבא כבר פתוח, אבל כדאי לנסות להגיע לשני כוכבים קודם.</p>' : ''}`;
@@ -1248,6 +1389,9 @@ const ACT = {
   start: b => startLevel(+b.dataset.lv),
   review: () => startReview(false),
   'review-round': () => startReview(true),
+  extra: b => startExtra(+b.dataset.i),
+  spin: () => spin(),
+  mpick: b => mpick(b),
   speak: b => speak(b.dataset.say),
   'learn-prev': () => { if (S.qi > 0) { S.qi--; nextScreen(); } },
   'learn-next': () => { S.qi++; nextScreen(); },
