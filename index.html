@@ -141,6 +141,10 @@ a { color: var(--ink); }
 }
 .gap.filled { border-bottom: 3px solid var(--good); color: var(--good); background: var(--good-soft); border-radius: .2em .2em 0 0; animation: pop .35s; }
 .paren { color: var(--muted); white-space: nowrap; }
+.rep-banner {
+  margin: 0; background: var(--slot); color: var(--ink); border-radius: 12px; padding: 6px 12px;
+  font-weight: 700; text-align: center; font-size: .95rem;
+}
 .explain {
   margin: 0; background: var(--warn-soft); border-radius: 14px; padding: 10px 14px; text-align: center;
   font-size: 1.05rem;
@@ -416,6 +420,16 @@ const RULES = {
   me: 'אני בעצמי', youAnd: 'אתה או את ועוד מישהו', boy: 'בן או איש אחד', girl: 'בת או אישה אחת',
   thing: 'חפץ, חיה או דבר אחד', weI: 'אני ועוד מישהו', many: 'כמה אנשים, חיות או דברים'
 };
+// How each rule is explained when the game finds it is a gap for the child.
+const GAP = {
+  me: 'כשמדברים על עצמי כותבים <bdi class="en">I</bdi>',
+  youAnd: 'כשיש <bdi class="en">you and…</bdi> (אתה ועוד מישהו) כותבים <bdi class="en">You</bdi>',
+  boy: 'בן או איש אחד, ולכן <bdi class="en">He</bdi>',
+  girl: 'בת או אישה אחת, ולכן <bdi class="en">She</bdi>',
+  thing: 'חפץ, חיה או דבר אחד, ולכן <bdi class="en">It</bdi>',
+  weI: 'כשיש <bdi class="en">…and I</bdi> (אני ועוד מישהו) כותבים <bdi class="en">We</bdi>',
+  many: 'כמה אנשים, חיות או דברים, ולכן <bdi class="en">They</bdi>'
+};
 // "Replace the word in brackets" questions.
 const REPLACE_Q = [
   { s: '___ is a smart girl.', n: 'Sarah', a: 'She', r: 'girl' },
@@ -598,6 +612,11 @@ function weakItems() {
     .sort((a, b) => a.s.m - b.s.m || b.s.wrong - a.s.wrong)
     .slice(0, 6);
 }
+function weakRules() {
+  return Object.keys(RULES).map(r => ({ r, s: P.words['r:' + r] }))
+    .filter(x => x.s && x.s.wrong > 0 && x.s.m < 3)
+    .sort((a, b) => a.s.m - b.s.m || b.s.wrong - a.s.wrong);
+}
 function today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function markToday() {
   const t = today();
@@ -712,6 +731,8 @@ function speakBtn(text, label) {
 // ---------- Home ----------
 function suggestion() {
   const weak = weakItems(), lv = levels(), tk = topicKey();
+  const wr = isPron() ? weakRules() : [];
+  if (wr.length) return { html: `מצאנו פער: ${GAP[wr[0].r]}. כדאי לחזק לפני שממשיכים.`, act: 'review', label: 'לחזק עכשיו' };
   if (weak.length >= 2) return { text: `כדאי לחזק: ${weak.map(x => x.en).join(', ')}`, act: 'review', label: 'לחזק עכשיו' };
   const next = lv.findIndex((_, i) => isOpen(tk, i) && !starsFor(tk, i));
   if (next === 0) return { text: isPron() ? 'מתחילים? קודם מכירים את כינויי הגוף, ואז מתרגלים לקראת המבחן.' : 'מתחילים? קודם מכירים את המילים, ואז מתרגלים.', act: 'start', lv: 0, label: 'להתחיל' };
@@ -774,7 +795,7 @@ function showHome() {
     ${helloHTML()}
     ${statsHTML()}
     ${topicTabs()}
-    <div class="tip"><p>${esc(tip.text)}</p>
+    <div class="tip"><p>${tip.html || esc(tip.text)}</p>
       ${tip.act ? `<button class="btn small" data-act="${tip.act}" ${tip.lv != null ? `data-lv="${tip.lv}"` : ''}>${tip.label}</button>` : ''}</div>
     <div class="levels">${levelsHTML}</div>
     ${extra}`;
@@ -820,6 +841,11 @@ function showProgress() {
       <button class="btn small" data-act="review">לחזק עכשיו</button></div>` : ''}
     <h2 class="section-title">רמת הידיעה</h2>
     <div class="words">${rows}</div>
+    ${isPron() ? `<h2 class="section-title">הכללים</h2><div class="words">${Object.keys(RULES).map(r => {
+      const s = P.words['r:' + r], m = s ? s.m : 0;
+      return `<div class="wrow"><span class="w"><small>${GAP[r]}</small></span>
+        <span class="meter" aria-label="רמה ${m} מתוך ${MASTER}">${Array.from({ length: MASTER }, (_, i) => `<i class="${i < m ? 'on' : ''}"></i>`).join('')}</span>${masteryPill(s)}</div>`;
+    }).join('')}</div>` : ''}
     <h2 class="section-title">תגים</h2>
     <div class="badges">${badges}</div>
     <h2 class="section-title">משחקים אחרונים</h2>
@@ -835,27 +861,45 @@ function showProgress() {
 function startLevel(lv) {
   S.level = lv; S.def = levels()[lv];
   if (S.def.kind === 'plearn') return beginRound(PRONOUNS.map((_, i) => i));
-  if (S.def.kind === 'quiz') return beginRound(buildQuiz(S.def.q));
+  if (S.def.kind === 'quiz') return beginWithFocus(buildQuiz(S.def.q), S.def.mock ? [] : focusQuestions(S.def.q, 2));
   const idx = list().words.map((_, i) => i);
-  beginRound(S.def.kind === 'learn' ? idx : shuffle(idx));
+  if (S.def.kind === 'learn') return beginRound(idx);
+  const weak = weakItems().map(x => list().words.findIndex(w => w.en === x.en)).filter(i => i >= 0).slice(0, 2);
+  beginWithFocus(shuffle(idx), weak);
+}
+// Spread items from earlier gaps through the round, tagged so the child sees why they came back.
+function beginWithFocus(queue, focus) {
+  const q = queue.slice(), tags = q.map(() => undefined);
+  focus.forEach(f => {
+    const pos = 2 + Math.floor(Math.random() * (q.length - 1));
+    q.splice(pos, 0, f); tags.splice(pos, 0, 'focus');
+  });
+  beginRound(q, tags);
 }
 function startExtra(i) {
   S.level = i; S.def = PRON_GAMES[i];
-  beginRound(S.def.kind === 'match' ? PRONOUNS.map((_, j) => j) : buildQuiz(S.def.q));
+  if (S.def.kind === 'match') return beginRound(PRONOUNS.map((_, j) => j));
+  beginWithFocus(buildQuiz(S.def.q), focusQuestions(S.def.q, 2));
 }
 function startReview(fromRound) {
   // Practice what went wrong in this round, or else the weakest items overall.
   let keys = fromRound ? S.missedKeys : [];
   if (!keys || !keys.length) keys = weakItems().map(x => x.en);
-  if (!keys.length) return showHome();
   S.level = -1;
-  if (isPron()) { S.def = PRON_REVIEW; return beginRound(reviewQuiz(keys)); }
+  if (isPron()) {
+    let rules = fromRound ? [...new Set(S.missedRules)] : [];
+    if (!rules.length) rules = weakRules().map(x => x.r);
+    if (!keys.length && !rules.length) return showHome();
+    S.def = Object.assign({}, PRON_REVIEW, { name: rules.length ? 'תרגול ממוקד בפער' : PRON_REVIEW.name, focusRules: rules });
+    return beginRound(reviewQuiz(keys, rules));
+  }
+  if (!keys.length) return showHome();
   S.def = REVIEW;
   beginRound(shuffle(keys.map(en => list().words.findIndex(w => w.en === en)).filter(i => i >= 0)));
 }
-function beginRound(queue) {
-  S.queue = queue; S.qi = 0; S.firstTry = 0; S.busy = false;
-  S.combo = 0; S.xpGain = 0; S.missed = []; S.answers = []; S.newBadges = [];
+function beginRound(queue, rep) {
+  S.queue = queue; S.rep = rep || []; S.qi = 0; S.firstTry = 0; S.busy = false; S.added = 0;
+  S.combo = 0; S.xpGain = 0; S.missed = []; S.missedRules = []; S.answers = []; S.newBadges = [];
   markToday(); save();
   nextScreen();
 }
@@ -959,7 +1003,7 @@ function renderFill(msg, cls) {
   const left = W.hidden.length - W.step;
   const choices = finished ? '' : W.options.map(o =>
     `<button class="choice" data-act="choose" data-l="${o}" ${W.tried.includes(o) ? 'disabled' : ''}>${o}</button>`).join('');
-  app.innerHTML = `${topBar(true)}${progressHTML()}
+  app.innerHTML = `${topBar(true)}${progressHTML()}${repBanner()}
     <div class="card">
       <div class="pic" aria-hidden="true">${w.pic}</div>
       <div class="he">${w.he}</div>
@@ -981,11 +1025,12 @@ function choose(btn) {
     W.step++;
     if (W.step >= W.hidden.length) {
       const w = cur();
-      if (!W.mistake) { S.firstTry++; addXP(5); } else S.missed.push(w.en);
+      let back = false;
+      if (!W.mistake) { S.firstTry++; addXP(5); } else { S.missed.push(w.en); back = insertLater(S.queue[S.qi]); }
       recordWord(w.en, !W.mistake, 'fill');
       save();
       S.busy = true;
-      renderFill(combo ? `${praise()} 🔥 ${combo}` : (W.mistake ? 'הצלחתם! בפעם הבאה זה יהיה עוד יותר קל' : praise()), combo ? 'warm' : 'good');
+      renderFill(combo ? `${praise()} 🔥 ${combo}` : (W.mistake ? (back ? 'הצלחתם! נחזור למילה הזאת עוד מעט 🔁' : 'הצלחתם! בפעם הבאה זה יהיה עוד יותר קל') : praise()), combo ? 'warm' : 'good');
       speak(w.en);
       setTimeout(() => { S.qi++; nextScreen(); }, 1400);
     } else {
@@ -1025,7 +1070,7 @@ function renderDict(msg, cls, typed, mark) {
   const w = cur(), W = S.word;
   typed = typed || '';
   const done = W.solved || W.revealed;
-  app.innerHTML = `${topBar(true)}${progressHTML()}
+  app.innerHTML = `${topBar(true)}${progressHTML()}${repBanner()}
     <div class="card">
       <div class="pic" aria-hidden="true">${w.pic}</div>
       <div class="he">${w.he}</div>
@@ -1063,7 +1108,7 @@ function checkDict() {
     const first = W.attempts === 0 && W.hints === 0;
     let combo = '';
     if (first) { S.firstTry++; addXP(15); combo = hitCombo(); }
-    else { addXP(5); S.missed.push(w.en); }
+    else { addXP(5); S.missed.push(w.en); insertLater(S.queue[S.qi]); }
     recordWord(w.en, first, 'dict');
     save();
     sndGood(); speak(w.en);
@@ -1077,6 +1122,7 @@ function checkDict() {
   if (W.attempts >= 3) {
     W.revealed = true;
     S.missed.push(w.en);
+    insertLater(S.queue[S.qi]);
     recordWord(w.en, false, 'dict');
     save();
     speak(w.en);
@@ -1121,7 +1167,7 @@ function qMeaningHe(v) {
     hint: `חשבו: על מי מדברים כשאומרים "${v.he}"?`, explain: `${v.he} = <bdi class="en">${v.a}</bdi>` };
 }
 function qSentence(x, kind, mock) {
-  return { kind, item: x.a, s: x.s, n: x.n, answer: x.a, say: x.s.replace('___', x.a),
+  return { kind, item: x.a, r: x.r, s: x.s, n: x.n, answer: x.a, say: x.s.replace('___', x.a),
     options: mock ? (kind === 'replace' ? ALL_P.slice() : TEST6.slice()) : threeOptions(x.a),
     hint: `על מי מדברים? <bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}`, explain: `<bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}, ולכן <bdi class="en">${x.a}</bdi>` };
 }
@@ -1131,16 +1177,16 @@ function fourOptions(a) {
 function whyHint(x) { return `על מי מדברים? <bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}`; }
 function whyExplain(x) { return `<bdi class="en">${esc(x.n)}</bdi> = ${RULES[x.r]}, ולכן <bdi class="en">${x.a}</bdi>`; }
 function qWheel(x) {
-  return { kind: 'wheel', item: x.a, pic: x.pic, prompt: x.n, answer: x.a, say: x.a, options: fourOptions(x.a),
+  return { kind: 'wheel', item: x.a, r: x.r, pic: x.pic, prompt: x.n, answer: x.a, say: x.a, options: fourOptions(x.a),
     hint: whyHint(x), explain: whyExplain(x) };
 }
 function qListen(x) {
-  return { kind: 'listen', item: x.a, s: x.s, n: x.n, answer: x.a, say: x.s.replace('___', x.a), options: threeOptions(x.a),
+  return { kind: 'listen', item: x.a, r: x.r, s: x.s, n: x.n, answer: x.a, say: x.s.replace('___', x.a), options: threeOptions(x.a),
     hint: 'הקשיבו שוב. כינוי הגוף נמצא בתחילת המשפט', explain: whyExplain(x) };
 }
 function qTF(x) {
   const right = Math.random() < 0.5, shown = right ? x.a : pick(NEAR[x.a]);
-  return { kind: 'tf', item: x.a, n: x.n, shown, answer: right ? 'נכון' : 'לא נכון', options: ['לא נכון', 'נכון'], heOpts: true, say: x.a,
+  return { kind: 'tf', item: x.a, r: x.r, n: x.n, shown, answer: right ? 'נכון' : 'לא נכון', options: ['לא נכון', 'נכון'], heOpts: true, say: x.a,
     hint: whyHint(x),
     explain: right ? `נכון! <bdi class="en">${esc(x.n)}</bdi> = <bdi class="en">${x.a}</bdi>`
                    : `לא נכון. ${whyExplain(x)} ולא <bdi class="en">${shown}</bdi>` };
@@ -1161,11 +1207,59 @@ function buildQuiz(type) {
     ...tag(shuffle(SENT_Q).slice(0, 5).map(x => qSentence(x, 'sent', true)), 'חלק ג׳: השלמת משפטים')
   ];
 }
-function reviewQuiz(ids) {
-  const pool = shuffle([...REPLACE_Q.map(x => qSentence(x, 'replace')), ...SENT_Q.map(x => qSentence(x, 'sent'))].filter(q => ids.includes(q.item)));
-  const qs = pool.slice(0, 6);
+function reviewQuiz(ids, rules) {
+  rules = rules || [];
+  const all = [...REPLACE_Q.map(x => qSentence(x, 'replace')), ...SENT_Q.map(x => qSentence(x, 'sent')), ...WHEEL_ITEMS.map(qWheel)];
+  const byRule = shuffle(all.filter(q => rules.includes(q.r)));
+  const byItem = shuffle(all.filter(q => !rules.includes(q.r) && ids.includes(q.item)));
+  const qs = [...byRule.slice(0, 6), ...byItem].slice(0, 8);
   if (qs.length < 4) qs.push(...shuffle(meaningPool().filter(q => ids.includes(q.item))).slice(0, 4 - qs.length));
   return shuffle(qs);
+}
+// Where each kind of question comes from, so the game can make another one like it.
+function poolFor(type) {
+  const map = {
+    replace: [REPLACE_Q, x => qSentence(x, 'replace')],
+    sent: [SENT_Q, x => qSentence(x, 'sent')],
+    wheel: [WHEEL_ITEMS, qWheel],
+    listen: [[...REPLACE_Q, ...SENT_Q], qListen],
+    tf: [[...WHEEL_ITEMS, ...REPLACE_Q.filter(x => x.a !== 'I')], qTF]
+  };
+  return map[type] ? { raw: map[type][0], make: map[type][1] } : null;
+}
+function focusQuestions(type, n) {
+  if (type === 'meaning') {
+    const ids = weakItems().map(x => x.en);
+    return shuffle(meaningPool().filter(q => ids.includes(q.item))).slice(0, n);
+  }
+  const pf = poolFor(type), rules = weakRules().map(x => x.r);
+  if (!pf || !rules.length) return [];
+  return shuffle(pf.raw.filter(x => rules.includes(x.r))).slice(0, n).map(pf.make);
+}
+function similarQuestion(q) {
+  if (q.kind === 'meaning') return shuffle(meaningPool().filter(x => x.item === q.item && x.prompt !== q.prompt))[0] || null;
+  const pf = poolFor(q.kind);
+  if (!pf) return null;
+  const used = new Set(S.queue.slice(S.qi).map(x => x.n));
+  const raw = shuffle(pf.raw.filter(x => x.r === q.r && x.n !== q.n && !used.has(x.n)))[0];
+  return raw ? pf.make(raw) : null;
+}
+// After a mistake, the same kind of item comes back a little later in the round.
+const MAX_ADDED = 4;
+function insertLater(item) {
+  if (S.added >= MAX_ADDED || S.rep[S.qi] === 'again' || !item) return false;
+  const pos = Math.min(S.qi + 3, S.queue.length);
+  S.queue.splice(pos, 0, item); S.rep.splice(pos, 0, 'again');
+  S.added++;
+  return true;
+}
+function repBanner() {
+  const q = S.queue[S.qi];
+  let tag = S.rep[S.qi];
+  if (!tag && S.def.focusRules && q && q.r && S.def.focusRules.includes(q.r)) tag = 'focus';
+  if (!tag) return '';
+  const gap = q && q.r ? `: ${GAP[q.r]}` : '';
+  return `<p class="rep-banner">${tag === 'again' ? '🔁 חוזרים לתרגל את מה שהיה קשה' : '🎯 מחזקים פער שמצאנו'}${gap}</p>`;
 }
 function sentenceHTML(q, show, answer) {
   const a = answer || q.answer;
@@ -1185,7 +1279,7 @@ function renderWheel() {
   const segs = shuffle([q.pic, ...others]);
   W.k = segs.indexOf(q.pic);
   const labels = segs.map((pic, i) => `<span class="wseg" style="transform: rotate(${i * 45 + 22.5}deg) translateY(calc(var(--size) * -0.33))">${pic}</span>`).join('');
-  app.innerHTML = `${topBar(true)}${progressHTML()}
+  app.innerHTML = `${topBar(true)}${progressHTML()}${repBanner()}
     <p class="prompt">סובבו את הגלגל וגלו על מי מדברים</p>
     <div class="wheel-wrap"><div class="pointer" aria-hidden="true">▼</div><div class="wheel" id="wheel" aria-hidden="true">${labels}</div></div>
     <div class="row"><button class="btn" data-act="spin">סובבו!</button></div>`;
@@ -1220,7 +1314,7 @@ function renderQuiz(msg, cls) {
   const opts = q.options.map((o, i) => `<button class="choice word ${q.dir === 'en' || q.heOpts ? 'he-opt' : ''} ${show && o === q.answer ? 'right' : ''}"
       data-act="qpick" data-i="${i}" ${W.tried.includes(i) || show ? 'disabled' : ''}>${o}</button>`).join('');
   const explain = !mock && W.mistake ? `<p class="explain">💡 ${show ? q.explain : q.hint}</p>` : '';
-  app.innerHTML = `${topBar(true)}${progressHTML()}
+  app.innerHTML = `${topBar(true)}${progressHTML()}${repBanner()}
     ${q.section ? `<p class="section-label">${q.section}</p>` : ''}
     <div class="card">${body}${canHear ? speakBtn(q.say, ['meaning', 'wheel', 'tf'].includes(q.kind) ? 'השמיעו' : (q.kind === 'listen' && !show ? 'השמיעו שוב' : 'השמיעו את המשפט')) : ''}</div>
     <div class="choices">${opts}</div>
@@ -1234,8 +1328,9 @@ function qpick(b) {
   if (S.def.mock) {
     // Like a real test: no feedback until the end.
     S.answers.push({ q, val, ok });
-    if (ok) { S.firstTry++; addXP(4); } else S.missed.push(q.item);
+    if (ok) { S.firstTry++; addXP(4); } else { S.missed.push(q.item); if (q.r) S.missedRules.push(q.r); }
     recordWord('p:' + q.item, ok, 'quiz');
+    if (q.r) recordWord('r:' + q.r, ok, 'quiz');
     save();
     tone([520]);
     S.qi++; nextScreen();
@@ -1245,8 +1340,9 @@ function qpick(b) {
     sndGood();
     W.done = true;
     let combo = '';
-    if (!W.mistake) { S.firstTry++; addXP(5); combo = hitCombo(); } else S.missed.push(q.item);
+    if (!W.mistake) { S.firstTry++; addXP(5); combo = hitCombo(); } else { S.missed.push(q.item); if (q.r) S.missedRules.push(q.r); }
     recordWord('p:' + q.item, !W.mistake, 'quiz');
+    if (q.r) recordWord('r:' + q.r, !W.mistake, 'quiz');
     save();
     speak(q.say);
     const msg = W.mistake ? 'נכון! קראו את ההסבר' : (combo ? `${praise()} 🔥 ${combo}` : praise());
@@ -1257,7 +1353,8 @@ function qpick(b) {
     W.mistake = true;
     S.combo = 0;
     W.tried.push(i);
-    renderQuiz(pick(AFTER_MISS_Q), 'bad');
+    const back = W.tried.length === 1 && insertLater(similarQuestion(q));
+    renderQuiz(pick(AFTER_MISS_Q) + (back ? ' · נחזור לזה עוד מעט 🔁' : ''), 'bad');
     const el = app.querySelector(`.choice[data-i="${i}"]`);
     if (el) el.classList.add('shake');
   }
@@ -1329,6 +1426,9 @@ function showDone() {
   P.history.push({ t: Date.now(), tk, lv: S.level, name: def.name, score: learn ? n : S.firstTry, total: n, stars: S.level >= 0 ? stars : 0 });
   P.history = P.history.slice(-40);
   S.missedKeys = [...new Set(S.missed)];
+  const gapCount = {};
+  (S.missedRules || []).forEach(r => { gapCount[r] = (gapCount[r] || 0) + 1; });
+  const gaps = Object.keys(gapCount).sort((a, b) => gapCount[b] - gapCount[a]).slice(0, 2);
   save();
   sndWin();
 
@@ -1356,7 +1456,7 @@ function showDone() {
       <small>ענית: <bdi class="en">${val}</bdi></small>${q.kind === 'meaning' ? '' : `<small>${q.explain}</small>`}</li>`).join('') : '';
   const hasNext = !def.extra && S.level >= 0 && S.level < lv.length - 1;
   const again = def.extra ? `data-act="extra" data-i="${S.level}"` : `data-act="start" data-lv="${S.level}"`;
-  const goNext = hasNext && stars >= 2;
+  const goNext = hasNext && stars >= 2 && !gaps.length;
   const nb = S.newBadges.map(id => BADGES.find(b => b.id === id)).map(b => `<span>${b.ico} ${b.name}</span>`).join('');
   app.innerHTML = `${topBar(true)}
     <div class="card done-card">
@@ -1366,17 +1466,18 @@ function showDone() {
       ${lines.map(l => `<p>${l}</p>`).join('')}
       <p class="gain">+${S.xpGain} נקודות</p>
       ${nb ? `<p>תגים חדשים:</p><div class="new-badges">${nb}</div>` : ''}
+      ${gaps.length ? `<p class="explain">🎯 הפער שמצאנו: ${gaps.map(r => GAP[r]).join('<br>')}</p>` : ''}
       ${wrongList ? `<p>הטעויות שלכם והתשובות הנכונות:</p><ul class="review-list">${wrongList}</ul>`
                   : (missedChips ? `<p>כדאי לחזק:</p><div class="hard">${missedChips}</div>` : '')}
     </div>
     <div class="row">
-      ${S.missedKeys.length && !def.review ? `<button class="btn ${def.mock ? '' : 'soft'}" data-act="review-round">לתרגל את הטעויות</button>` : ''}
+      ${S.missedKeys.length ? `<button class="btn ${def.mock || gaps.length ? '' : 'soft'}" data-act="review-round">${gaps.length ? 'לתרגל את הפער' : 'לתרגל את הטעויות'}</button>` : ''}
       ${goNext ? `<button class="btn" data-act="start" data-lv="${S.level + 1}">לשלב הבא: ${lv[S.level + 1].name}</button>` : ''}
-      ${!goNext && S.level >= 0 ? `<button class="btn ${def.mock && S.missedKeys.length ? 'soft' : ''}" ${again}>${def.mock ? 'מבחן חדש' : 'לשחק שוב ולשפר'}</button>` : ''}
+      ${!goNext && S.level >= 0 ? `<button class="btn ${(def.mock && S.missedKeys.length) || gaps.length ? 'soft' : ''}" ${again}>${def.mock ? 'מבחן חדש' : 'לשחק שוב ולשפר'}</button>` : ''}
       ${goNext ? `<button class="btn soft" ${again}>לשחק שוב</button>` : ''}
       <button class="btn soft" data-act="home">לתפריט</button>
     </div>
-    ${hasNext && !goNext ? '<p class="empty" style="text-align:center">השלב הבא כבר פתוח, אבל כדאי לנסות להגיע לשני כוכבים קודם.</p>' : ''}`;
+    ${hasNext && !goNext ? `<p class="empty" style="text-align:center">${gaps.length ? 'השלב הבא כבר פתוח, אבל כדאי קודם לסגור את הפער. זה לוקח רק דקה!' : 'השלב הבא כבר פתוח, אבל כדאי לנסות להגיע לשני כוכבים קודם.'}</p>` : ''}`;
   window.scrollTo(0, 0);
 }
 
